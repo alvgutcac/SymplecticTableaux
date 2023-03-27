@@ -1,5 +1,3 @@
-##### this is the version i could restore
-
 class SymplecticTableau(SageObject):
     """
     Symplectic tableaux are here implemented as King's tableaux
@@ -33,7 +31,6 @@ class SymplecticTableau(SageObject):
         self._n = n
         self._split = split
         self._shape = self.shape()
-        self._weight = self.weight()
         if alphabet == None:
             self._type = type
             if type == 'King':
@@ -45,6 +42,7 @@ class SymplecticTableau(SageObject):
         else:
             self._type = 'Custom'
             self._alphabet = alphabet
+        self._weight = self.weight()
     def __eq__(self, other):
         return self.King()._rows == other.King()._rows
     def __repr__(self):
@@ -85,10 +83,12 @@ class SymplecticTableau(SageObject):
     def size(self):
         return self._n
     def weight(self):
-        ###########
-        ## TO DO ##
-        ###########
-        return None
+        # TO DO: return symbolic variables instead of a string
+        t = sum(self.King().list(), [])
+        L = []
+        for i in range(self._n):
+            L.append(t.count(2*i) - t.count(2*i+1))
+        return ''.join('x%s^(%s)'%(i+1, L[i]) for i in range(self._n))
     def shape(self):
         if self._split:
             return Partition([int(len(row)/2) for row in self._rows])
@@ -249,7 +249,6 @@ def cosplitVersion(tab):
     Takes a tableau in the `1<2<...<2n`, relabels it to
     `n'<...<2'<1'<1<2<...<n`, and returns its cosplit version.
     '''
-    print(tab)
     new = []
     for col in tab._cols:
         new = new + _cosplitCol(col, tab._n)
@@ -421,7 +420,7 @@ def Sheats(tab):
                 add[i] = [newMNormal]*cols[i].count(mNormal) + add[i]
             
             # we prepare for the next iteration
-            k = len([col for col in cols if mPrime in col])
+            k = k + len([col for col in cols if mPrime in col]) - 1
             colsMove = [[i for i in col if i != mNormal and i != mPrime] for col in cols]
             Cols = sum([_splitCol(col, n) for col in colsMove], [])
         colsMoved = _splitInverseCols(Cols, n)
@@ -568,7 +567,6 @@ def SheatsInverse(tab):
                     if cols[j][i] == mPrime]
                     for j in range(len(cols))], [])
         colsFix = [[i for i in col if i > mPrime] for col in cols]
-        print('We have %s and %s'%(m, colsMove))
         
         while len(punctures) != 0:
             puncture = punctures[0]; punctures = punctures[1:]
@@ -580,9 +578,7 @@ def SheatsInverse(tab):
             (Cols, (_, _), _) =_sigmaAux(ColsSig, puncSig, m)
             
             colsMove = _splitInverseCols(Cols, m)
-            
-            print(colsMove)
-            
+                        
             k = len([col for col in colsMove if len(col)!=0 and col[0]==newMPrime])
             for col in colsMove:
                 while 0 in col:
@@ -590,9 +586,7 @@ def SheatsInverse(tab):
             if mNormal in colsFix[k]:
                 colsMove[k] = colsMove[k] + [newMNormal]
                 colsFix[k].remove(mNormal)
-            colsMove[k] = [newMPrime] + colsMove[k]
-            
-            print('We have %s and %s'%(m, colsMove))
+            colsMove[0] = [newMPrime] + colsMove[0]
             
         cols = [colsMove[i] + colsFix[i] for i in range(len(cols))]
         for col in cols:
@@ -658,7 +652,7 @@ class SymplecticPattern(SageObject):
         return SymplecticPattern_to_KingTableau(self)
 
 def KingTableau_to_SymplecticPattern(T):
-    L = T.list(); N = 2*T._n; print(N)
+    L = T.list(); N = 2*T._n
     G = GelfandTsetlinPattern(Tableau(L))
     return SymplecticPattern([G[i][:int(N/2 - floor(i/2))] for i in range(N)])
     
