@@ -56,6 +56,14 @@ class SymplecticTableau(SageObject):
         return SymplecticTableauIterator(self)
     def __len__(self):
         return self._len
+    def _latex_(self):
+        # Warning: requires \usepackage{ytableau}
+        # Test if spaces are to be removed
+        alph = [''] + self._alphabet
+        return '\ytableaushort{' \
+                + ','.join('{' + '}{'.join(alph[i] for i in row) + '}' 
+                for row in self._rows) \
+                + '}'
     def list(self):
         return self._rows
     def len(self):
