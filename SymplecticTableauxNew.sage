@@ -1,3 +1,13 @@
+# How to use this:
+# Save this file in your computer. (E.g. in the desktop.)
+# Go to the Sage Console.
+# cd to the directory where the document is.
+#    sage: cd Desktop
+#    /home/sage/Desktop/
+# load the file.
+#    sage: load("SymplecticTableauxNew.sage")
+# Now you can use the commands defined here.
+
 class SymplecticTableau(SageObject):
     """
     Symplectic tableaux are here implemented as King's tableaux
@@ -5,6 +15,28 @@ class SymplecticTableau(SageObject):
     the alphabet ``1 < 1' < 2 < 2' < ... < n < n'``.
     
     (Skew tableaux are implemented by introducing 0s.)
+    
+    EXAMPLES::
+    sage: tab = SymplecticTableau(3, rows = [[1,1,2,4,4],[3,3,5,6]]); tab
+    1  1  1' 2' 2'
+    2  2  3  3'
+    sage: tab.is_well_defined()
+    True
+    sage: tab.DeConcini()
+    3' 2' 2' 2  2
+    1' 1' 1  3
+    sage: tab.Kashiwara()
+    1  2  2  2' 2'
+    3  3  3' 1'
+    sage: tab.f(1)
+    1  1' 1' 2' 2'
+    2  2  3  3'
+    sage: print(tab)
+    Symplectic tableau of type King, shape [5, 4], and weight x1^(-1)x2^(0)x3^(1)
+    sage: tab.shape()
+    [5, 4]
+    sage: latex(tab)
+    \ytableaushort{{1 }{1 }{1'}{2'}{2'},{2 }{2 }{3 }{3'}}
     """
     def __init__(self, n, rows = None, cols = None, type = 'King', alphabet = None, split = False):
         r"""
@@ -33,12 +65,13 @@ class SymplecticTableau(SageObject):
         self._shape = self.shape()
         if alphabet == None:
             self._type = type
+            l = floor(log(self._n)/log(10))
             if type == 'King':
-                self._alphabet = sum([[str(i) + " ", str(i) + "'"] for i in [1..n]], [])
+                self._alphabet = sum([[str(i) + " "*(l+1), str(i) + "'" + " "*l] for i in [1..n]], [])
             elif type == 'DeConcini':
-                self._alphabet = [str(i) + "'" for i in [1..n][::-1]] + [str(i) + " " for i in [1..n]]
+                self._alphabet = [str(i) + "'" + " "*l for i in [1..n][::-1]] + [str(i) + " "*(l+1) for i in [1..n]]
             elif type == 'Kashiwara':
-                self._alphabet = [str(i) + " " for i in [1..n]] + [str(i) + "'" for i in [1..n][::-1]]
+                self._alphabet = [str(i) + " "*(l+1) for i in [1..n]] + [str(i) + "'" + " "*l for i in [1..n][::-1]]
         else:
             self._type = 'Custom'
             self._alphabet = alphabet
@@ -84,9 +117,9 @@ class SymplecticTableau(SageObject):
         if self._type == 'King':
             return all(self._rows[i][0] >= 2*i+1 for i in range(len(self._rows)))
         elif self._type == 'DeConcini':
-            return all([is_admissible(c, self._n) for c in self._cols]) and splitVersion(self._rows, n).is_semistandard()
+            return all([is_admissible(c, self._n) for c in self._cols]) and splitVersion(self)._t.is_semistandard()
         elif self._type == 'Kashiwara':
-            return all([is_coadmissible(c, self._n) for c in self._cols]) and cosplitVersion(self._rows, n).is_semistandard()
+            return all([is_coadmissible(c, self._n) for c in self._cols]) and cosplitVersion(self)._t.is_semistandard()
         raise ValueError("Well-definedness cannot be checked on a custom tableau")
     def n(self):
         return self._n
