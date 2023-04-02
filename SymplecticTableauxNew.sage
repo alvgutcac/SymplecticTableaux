@@ -46,6 +46,8 @@ class SymplecticTableau(SageObject):
     def __eq__(self, other):
         return self.King()._rows == other.King()._rows
     def __repr__(self):
+        if self._rows == []:
+            return ''
         alph = ['* '] + self._alphabet
         return '\n'.join(' '.join(alph[i] for i in row) for row in self._rows)
     def __str__(self):
@@ -60,8 +62,8 @@ class SymplecticTableau(SageObject):
         # Warning: requires \usepackage{ytableau}
         # Test if spaces are to be removed
         alph = [''] + self._alphabet
-        return '\ytableaushort{' \
-                + ','.join('{' + '}{'.join(alph[i] for i in row) + '}' 
+        return r"\ytableaushort{" \
+                + ','.join('{' + '}{'.join(alph[i] for i in row) + '}' \
                 for row in self._rows) \
                 + '}'
     def list(self):
@@ -218,6 +220,8 @@ class SymplecticTableauIterator:
         raise StopIteration
         
 def transpose(tab):
+    if tab == []:
+        return []
     return [[row[i] for row in tab if len(row)>i] for i in range(len(tab[0]))]
 
 def _circles(col, n):
@@ -639,8 +643,8 @@ def check_all_BKinvolutions(lam, i, max_entry = None):
     if max_entry == None:
         max_entry = 2*len(lam)
     for t in SemistandardTableaux(lam, max_entry = max_entry):
-        if is_King(t):
-            t = KingTableau(t)
+        t = SymplecticTableau(max_entry, rows = t)
+        if t.is_well_defined():
             if t != t.bender_knuth_involution(i).bender_knuth_involution(i):
                 print(t)
                 break
@@ -684,6 +688,7 @@ def SymplecticPattern_to_KingTableau(G):
         for cell in Partition(Part).cells():
             D[cell] = i
     return KingTableau(_dict_to_tableau(D, L[0]))
+    return SymplecticTableau(n, rows = _dict_to_tableau(D, L[0]))
     
 def _dict_to_tableau(D, shape):
     rows = []
