@@ -9,15 +9,41 @@
 # Now you can use the commands defined here.
 
 class SymplecticTableau(SageObject):
-    """
-    Symplectic tableaux are here implemented as King's tableaux
-    in the alphabet ``1 < 2 < ... < 2n``. They are displayed in
-    the alphabet ``1 < 1' < 2 < 2' < ... < n < n'``.
+    r"""
+    Four different combinatorial models for symplectic tableaux
+    are implemented. Internally, these tableaux are always in the
+    alphabet ``1 < 2 < ... < 2n.`` Later, they may be displayed
+    with a different alphabet. 
     
-    (Skew tableaux are implemented by introducing 0s.)
+    The default model is King's. They are displayed in the alphabet
+    ``1 < 1' < 2 < 2' < ... < n < n'.``
+    They are well-defined if every column is admissible, that is,
+    if for every `i` there are at most `i` numbers smaller or equal
+    to `i'` in each column.
+    
+    A second model is De Concini's. These are displayed in the alphabet
+    ``n' < ... < 2' < 1' < 1 < 2 < ... < n.``
+    These are well-defined if every column is admissible (after
+    reordering to the King's alphabet) and their split version is
+    semistandard.
+    
+    A third model is Krattenthaler's. These are displayed in the
+    alphabet ``1 < 2 < ... < 2n.``
+    These are well-defined when they are the split version of a
+    De Concini tableau.
+    
+    A final model is Kashiwara's. These are displayed in the alphabet
+    ``1 < 2 < ... < n < n' < ... < 2' < 1'.``
+    These are well-defined when they are their cosplit version is
+    a Krattenthaler tableau.
+    
+    Additionally, a custom type of tableaux can be defined by specifying
+    the alphabet in which they should be displayed.
+    
+    Skew tableaux are implemented by introducing 0s.
     
     EXAMPLES::
-    sage: tab = SymplecticTableau(3, rows = [[1,1,2,4,4],[3,3,5,6]]); tab
+    sage: tab = SymplecticTableau(3, rows = [[1,1,2,3,3],[4,4,5,6]]); tab
     1  1  1' 2' 2'
     2  2  3  3'
     sage: tab.is_well_defined()
@@ -38,19 +64,17 @@ class SymplecticTableau(SageObject):
     sage: latex(tab)
     \ytableaushort{{1 }{1 }{1'}{2'}{2'},{2 }{2 }{3 }{3'}}
     """
-    def __init__(self, n, rows = None, cols = None, type = 'King', alphabet = None, split = False):
+    def __init__(self, n, rows = None, cols = None, type = 'King', alphabet = None):
         r"""
         INPUT::
             - n : Positive integer
             - rows : SemistandardTableau or list of lists of integers
             - cols : SemistandardTableau or list of lists of integers
-            - type : Either 'King', 'DeConcini' or 'Kashiwara'. (Default: 'King')
+            - type : Either 'King', 'DeConcini', 'Krattenthaler' or 'Kashiwara'. (Default: 'King')
             - alphabet : a list of strings of fixed length. (Default: None)
-            - split : Boolean
         """
         assert bool(rows == None) != bool(cols == None), "Exactly one of 'rows' or 'cols' must be provided"
         assert bool(type == None) != bool(alphabet == None), "Exactly one of 'type' or 'alphabet' must be provided"
-        assert bool(not split) or bool(type == 'DeConcini' or type == 'Kashiwara'), "Split tableaux must be of type De Concini or Kashiwara"
         
         if rows != None:
             self._rows = [list(row) for row in rows]
@@ -61,20 +85,22 @@ class SymplecticTableau(SageObject):
         self._t = SemistandardTableau(self._rows)
         self._len = len(self._rows)
         self._n = n
-        self._split = split
-        self._shape = self.shape()
         if alphabet == None:
             self._type = type
             l = floor(log(self._n)/log(10))
             if type == 'King':
+                # The code for normalizing the length of strings does not work
                 self._alphabet = sum([[str(i) + " "*(l+1), str(i) + "'" + " "*l] for i in [1..n]], [])
             elif type == 'DeConcini':
-                self._alphabet = [str(i) + "'" + " "*l for i in [1..n][::-1]] + [str(i) + " "*(l+1) for i in [1..n]]
+                self._alphabet = [str(i) + "'" + " " for i in [1..n][::-1]] + [str(i) + " "*(l+1) for i in [1..n]]
+            elif type == 'Krattenthaler':
+                self._alphabet = [str(i) + " "*l for i in [1..2*n]]
             elif type == 'Kashiwara':
                 self._alphabet = [str(i) + " "*(l+1) for i in [1..n]] + [str(i) + "'" + " "*l for i in [1..n][::-1]]
         else:
             self._type = 'Custom'
             self._alphabet = alphabet
+        self._shape = self.shape()
         self._weight = self.weight()
     def __eq__(self, other):
         return self.King()._rows == other.King()._rows
@@ -84,8 +110,6 @@ class SymplecticTableau(SageObject):
         alph = ['* '] + self._alphabet
         return '\n'.join(' '.join(alph[i] for i in row) for row in self._rows)
     def __str__(self):
-        if self._split:
-            return f"Split symplectic tableau of type {self._type}, shape {self._shape}, and weight {self._weight}"
         return f"Symplectic tableau of type {self._type}, shape {self._shape}, and weight {self._weight}"
     def __iter__(self):
         return SymplecticTableauIterator(self)
@@ -112,12 +136,12 @@ class SymplecticTableau(SageObject):
     def rows(self):
         return self._rows
     def is_well_defined(self):
-        if self._split:
-            return self._t.is_semistandard()
         if self._type == 'King':
             return all(self._rows[i][0] >= 2*i+1 for i in range(len(self._rows)))
         elif self._type == 'DeConcini':
             return all([is_admissible(c, self._n) for c in self._cols]) and splitVersion(self)._t.is_semistandard()
+        elif self._type == 'Krattenthaler':
+            return cosplitVersion(cosplitInverse(self)) == self and self._t.is_semistandard()
         elif self._type == 'Kashiwara':
             return all([is_coadmissible(c, self._n) for c in self._cols]) and cosplitVersion(self)._t.is_semistandard()
         raise ValueError("Well-definedness cannot be checked on a custom tableau")
@@ -133,12 +157,12 @@ class SymplecticTableau(SageObject):
             L.append(t.count(2*i) - t.count(2*i+1))
         return ''.join('x%s^(%s)'%(i+1, L[i]) for i in range(self._n))
     def shape(self):
-        if self._split:
+        if self._type == 'Krattenthaler':
             return Partition([int(len(row)/2) for row in self._rows])
         else:
             return Partition([len(row) for row in self._rows])
     def bender_knuth_involution(self, i, display=False):
-        assert type == 'King', 'Bender--Knuth involutions are only implemented on King tableaux'
+        assert self._type == 'King', 'Bender--Knuth involutions are only implemented on King tableaux'
         T0 = SemistandardTableau(self._rows)
         T1 = T0.bender_knuth_involution(2*i)
         T2 = T1.bender_knuth_involution(2*i-1)
@@ -156,47 +180,78 @@ class SymplecticTableau(SageObject):
             print('Now applying Bender--Knuth to the tableau')
             tabs = [T0, T1, T2, T3, T4, T5]
             for i in range(len(tabs)):
-                print(KingTableau(tabs[i])); print('                    = T%s\n'%str(i))
+                print(GelfandTsetlinPattern(tabs[i]).pp()); print('                    = T%s\n'%str(i))
+                #print(repr(SymplecticTableau(self._n, rows = tabs[i]))); print('                    = T%s\n'%str(i))
         return SymplecticTableau(self._n, rows = T5, type = 'King')
+    def alternativa(self, i, display=False):
+        assert self._type == 'King', 'Bender--Knuth involutions are only implemented on King tableaux'
+        T0 = SemistandardTableau(self._rows)
+        T1 = T0.bender_knuth_involution(2*i)
+        T2 = T1.bender_knuth_involution(2*i-1)
+        T3 = T2.bender_knuth_involution(2*i+1)
+        T4 = T3.bender_knuth_involution(2*i)
+        T5 = T4
+        T6 = T5.bender_knuth_involution(2*i)
+        T7 = T6.bender_knuth_involution(2*i-1)
+        T8 = T7.bender_knuth_involution(2*i+1)
+        T9 = T8.bender_knuth_involution(2*i)
+        if display:
+            print('Now applying Bender--Knuth to the tableau')
+            tabs = [T0, T1, T2, T3, T4, T5, T6, T7, T8, T9]
+            for i in range(len(tabs)):
+                print(GelfandTsetlinPattern(tabs[i]).pp()); print('                    = T%s\n'%str(i))
+                #print(repr(SymplecticTableau(self._n, rows = tabs[i]))); print('                    = T%s\n'%str(i))
+        return SymplecticTableau(self._n, rows = T9, type = 'King')
     def to_GTpattern(self):
         tking = self.King()
         return KingTableau_to_SymplecticPattern(tking)
     def King(self):
-        if self._split:
-            return splitInverse(self).King()
         if self._type == 'King':
             return self
         elif self._type == 'DeConcini':
             return DeConcini_to_King(self)
+        elif self._type == 'Krattenthaler':
+            return Krattenthaler_to_King(self)
         elif self._type == 'Kashiwara':
             return Kashiwara_to_King(self)
         raise ValueError("Cannot transfrom from custom to King tableau")
     def DeConcini(self):
-        if self._split:
-            return splitInverse(self).DeConcini()
         if self._type == 'King':
             return King_to_DeConcini(self)
         elif self._type == 'DeConcini':
             return self
+        elif self._type == 'Krattenthaler':
+            return Krattenthaler_to_DeConcini(self)
         elif self._type == 'Kashiwara':
             return Kashiwara_to_DeConcini(self)
         raise ValueError("Cannot transfrom from custom to De Concini tableau")
+    def Krattenthaler(self):
+        if self._type == 'King':
+            return King_to_Krattenthaler(self)
+        elif self._type == 'DeConcini':
+            return DeConcini_to_Krattenthaler(self)
+        elif self._type == 'Krattenthaler':
+            return self
+        elif self._type == 'Kashiwara':
+            return Kashiwara_to_Krattenthaler(self)
+        raise ValueError("Cannot transfrom from custom to Krattenthaler tableau")
     def Kashiwara(self):
-        if self._split:
-            return splitInverse(self).Kashiwara()
         if self._type == 'King':
             return King_to_Kashiwara(self)
         elif self._type == 'DeConcini':
             return DeConcini_to_Kashiwara(self)
+        elif self._type == 'Krattenthaler':
+            return Krattenthaler_to_Kashiwara(self)
         elif self._type == 'Kashiwara':
             return self
         raise ValueError("Cannot transfrom from custom to Kashiwara tableau")
     def _to_type(self, type):
-        assert not self._split, "Please unsplit the tableau first"
         if type == 'King':
             return self.King()
         elif type == 'DeConcini':
             return self.DeConcini()
+        elif type == 'Krattenthaler':
+            return self.Krattenthaler()
         elif type == 'Kashiwara':
             return self.Kashiwara()
         raise ValueError("Can only convert to types 'King', 'DeConcini' or 'Kashiwara'")
@@ -204,10 +259,9 @@ class SymplecticTableau(SageObject):
         r"""
         Applies the crystal operator f(i).
         """
-        assert not self._split, "Please unsplit the tableau first"
         if self._type == 'King' or self._type == 'DeConcini':
             I = self._n+1-i
-        elif self._type == 'Kashiwara':
+        elif self._type == 'Kashiwara' or self._type == 'Krattenthaler':
             I = i
         else:
             raise ValueError("Cannot perform crystal operators on custom tableaux")
@@ -223,10 +277,9 @@ class SymplecticTableau(SageObject):
         r"""
         Applies the crystal operator e(i).
         """
-        assert not self._split, "Please unsplit the tableau first"
         if self._type == 'King' or self._type == 'DeConcini':
             I = self._n+1-i
-        elif self._type == 'Kashiwara':
+        elif self._type == 'Kashiwara' or self._type == 'Krattenthaler':
             I = i
         else:
             raise ValueError("Cannot perform crystal operators on custom tableaux")
@@ -273,7 +326,7 @@ def splitVersion(tab):
     new = []
     for col in tab._cols:
         new = new + _splitCol(col, tab._n)
-    return SymplecticTableau(tab._n, cols = new, type = tab._type, split = True)
+    return SymplecticTableau(tab._n, cols = new, type = 'Krattenthaler')
     
 def _splitCol(col, n):
     circ = _circles(col, n)
@@ -297,7 +350,7 @@ def cosplitVersion(tab):
     new = []
     for col in tab._cols:
         new = new + _cosplitCol(col, tab._n)
-    return SymplecticTableau(tab._n, cols = new, type = tab._type, split = True)
+    return SymplecticTableau(tab._n, cols = new, type = 'Krattenthaler')
     
 def _cosplitCol(col, n):
     circ = _circles(col, n)
@@ -379,6 +432,14 @@ def DeConcini_to_Kashiwara(tab):
     return cosplitInverse(splitVersion(tab))
 def Kashiwara_to_DeConcini(tab):
     return splitInverse(cosplitVersion(tab))
+def King_to_Krattenthaler(tab):
+    return splitVersion(King_to_DeConcini(tab))
+def Krattenthaler_to_King(tab):
+    return DeConcini_to_King(splitInverse(tab))
+def DeConcini_to_Krattenthaler(tab):
+    return splitVersion(tab)
+def Kashiwara_to_Krattenthaler(tab):
+    return cosplitVersion(tab)
 def KashiwaraTableau_to_CrystalElement(tab):
     assert tab._type == 'Kashiwara', "This function expects a Kashiwara tableau"
     import sage.combinat.crystals.tensor_product
@@ -720,7 +781,6 @@ def SymplecticPattern_to_KingTableau(G):
     for (Part, i) in zip(L, range(n,0,-1)):
         for cell in Partition(Part).cells():
             D[cell] = i
-    return KingTableau(_dict_to_tableau(D, L[0]))
     return SymplecticTableau(n, rows = _dict_to_tableau(D, L[0]))
     
 def _dict_to_tableau(D, shape):
@@ -733,3 +793,32 @@ def _dict_to_tableau(D, shape):
             rows.append(row)
     return Tableau(rows)
     
+    
+class abstractPattern(SageObject):
+    def __init__(self, dict = None):
+        n = 3; self._n = n
+        if dict != None:
+            self._dict = dict
+        else:
+            self._dict = {
+                j : {
+                    i : var('x%s%s'%(i,j))
+                    for i in [1..ceil(j/2)]
+                }
+                for j in [1..2*n][::-1]
+            }
+            self._dict[4][3] = 0
+    def dict(self):
+        return self._dict
+    def list(self):
+        return [[self._dict[rowKey][colKey] for colKey in self._dict[rowKey]] for rowKey in self._dict]
+    def size(self):
+        return self._n
+    def _repr_(self):
+        return self.list()
+    def toggle(i, j):
+        D = self._dict
+        if j == 2*i:
+            D[j][j] = 0
+        D[i][j] = Min(D[j+1][i], D[j-1][i-1]) + Max(D[j+1][i+1], D[j-1][i]) - D[j][i]
+        return abstractPattern(dict = D)
