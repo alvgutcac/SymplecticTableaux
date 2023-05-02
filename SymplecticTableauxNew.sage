@@ -1,12 +1,58 @@
-# How to use this:
-# Save this file in your computer. (E.g. in the desktop.)
-# Go to the Sage Console.
-# cd to the directory where the document is.
-#    sage: cd Desktop
-#    /home/sage/Desktop/
-# load the file.
-#    sage: load("SymplecticTableauxNew.sage")
-# Now you can use the commands defined here.
+# ****************************************************************************
+#       Copyright (C) 2023 Álvaro Gutiérrez <gutierrez.caceres@outlook.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 2 of the License, or
+# (at your option) any later version.
+#                  https://www.gnu.org/licenses/
+# ****************************************************************************
+
+r"""
+Implementation of symplectic tableaux and symplectic patterns.
+
+Symplectic tableaux are type C analogues of semistandard Young tableaux.
+Explicitly, the generating function of symplectic tableaux of a given shape
+`\lambda` (a partition) is the character of the irreducible representation
+of `\mathfrak{sp}(2n)` indexed by `\lambda`. 
+
+In the literature, several definitions of symplectic tableaux are available.
+We implement four of these; King's tableaux [Kin]_, De Concini's tableaux [DeC]_,
+Krattenthaler's tableaux [Kra]_, and Kashiwara's tableaux [NK]_. Note that some
+functions on Kashiwara's tableaux are already implemented in Sage as part of the
+"tensor product of crystals" library.
+
+
+AUTHORS
+
+-  Álvaro Gutiérrez (2023): initial version
+
+.. rubric:: REFERENCES
+
+.. [DeC79] Corrado De Concini.
+    Symplectic standard tableaux.
+    Advances in Mathematics, 34(1):1–27, (1979).
+    :doi:`10.1016/0001-8708(79)90061-6`
+
+.. [Kin76] Ronald King.
+    Weight multiplicities for the classical groups.
+    Group Theoretical Methods in Physics, 490–499, (1976).
+    
+.. [KN94] Masaki Kashiwara and Toshiki Nakashima.
+    Crystal Graphs for Representations of the q-Analogue of Classical Lie Algebras.
+    Journal of Algebra, 165(2):295–345, (1994). 
+    :doi:`10.1006/jabr.1994.1114`
+   
+.. [Kra98] Christian Krattenthaler.
+    Identities for classical group characters of nearly rectangular shape.
+    Journal of Algebra, 209(1):1–64, (1998).
+    :doi:`10.1006/jabr.1998.7531`
+    
+.. [She99] Jeffrey Sheats.
+    A symplectic jeu de taquin bijection between the tableaux of King and of De Concini.
+    Transactions of the American Mathematical Society, 351(9):3569–3607, (1999).
+    http://www.jstor.org/stable/117933
+"""
 
 class SymplecticTableau(SageObject):
     r"""
@@ -25,7 +71,7 @@ class SymplecticTableau(SageObject):
     ``n' < ... < 2' < 1' < 1 < 2 < ... < n.``
     These are well-defined if every column is admissible (after
     reordering to the King's alphabet) and their split version is
-    semistandard.
+    semistandard. See [She
     
     A third model is Krattenthaler's. These are displayed in the
     alphabet ``1 < 2 < ... < 2n.``
@@ -66,7 +112,7 @@ class SymplecticTableau(SageObject):
     """
     def __init__(self, n, rows = None, cols = None, type = 'King', alphabet = None):
         r"""
-        INPUT::
+        INPUT:
             - n : Positive integer
             - rows : SemistandardTableau or list of lists of integers
             - cols : SemistandardTableau or list of lists of integers
@@ -92,7 +138,7 @@ class SymplecticTableau(SageObject):
                 # The code for normalizing the length of strings does not work
                 self._alphabet = sum([[str(i) + " "*(l+1), str(i) + "'" + " "*l] for i in [1..n]], [])
             elif type == 'DeConcini':
-                self._alphabet = [str(i) + "'" + " " for i in [1..n][::-1]] + [str(i) + " "*(l+1) for i in [1..n]]
+                self._alphabet = [str(i) + "'" + " "*l for i in [1..n][::-1]] + [str(i) + " "*(l+1) for i in [1..n]]
             elif type == 'Krattenthaler':
                 self._alphabet = [str(i) + " "*l for i in [1..2*n]]
             elif type == 'Kashiwara':
@@ -111,6 +157,10 @@ class SymplecticTableau(SageObject):
         return '\n'.join(' '.join(alph[i] for i in row) for row in self._rows)
     def __str__(self):
         return f"Symplectic tableau of type {self._type}, shape {self._shape}, and weight {self._weight}"
+    def cols(self):
+        return self._cols
+    def transpose(self):
+        return self._cols
     def __iter__(self):
         return SymplecticTableauIterator(self)
     def __len__(self):
@@ -125,17 +175,20 @@ class SymplecticTableau(SageObject):
                 + '}'
     def list(self):
         return self._rows
-    def len(self):
-        return self._len
-    def dict(self):
-        return {i: self._rows[i] for i in self._len}
+    def rows(self):
+        return self._rows
     def cols(self):
         return self._cols
     def transpose(self):
         return self._cols
-    def rows(self):
-        return self._rows
+    def len(self):
+        return self._len
+    def dict(self):
+        return {i: self._rows[i] for i in self._len}
     def is_well_defined(self):
+        r"""
+        Checks if the tableau ``self`` is a tableau of type ``self._type``.
+        """
         if self._type == 'King':
             return all(self._rows[i][0] >= 2*i+1 for i in range(len(self._rows)))
         elif self._type == 'DeConcini':
@@ -162,8 +215,88 @@ class SymplecticTableau(SageObject):
         else:
             return Partition([len(row) for row in self._rows])
     def bender_knuth_involution(self, i, display=False):
-        assert self._type == 'King', 'Bender--Knuth involutions are only implemented on King tableaux'
-        T0 = SemistandardTableau(self._rows)
+        r"""
+        Performs the `i`th Bender--Knuth involution on the tableau.
+
+        The `i`th Bender--Knuth involution applied to a tableau with
+        weight `x^{\lambda}` returns a tableau of same shape and 
+        with weight `s_i.x^{\lambda}`, where `s_0, ..., s_{n-1}` are the
+        generators of the Weyl group of type C. These are analogs of type
+        A Bender--Knuth involutions.
+        
+        To compute the `0`th Bender--Knuth involution on a King tableau,
+        we interpret it as a semistandard tableau in the alphabet `1<...<2n`
+        and then perform the `1`st (type A) Bender--Knuth involution.
+        
+        For `i = 1, ..., n-1`, the `i`th Bender--Knuth involution on a King
+        tableau is defined as the composite of five maps. The first four maps
+        are usual type A Bender--Knuth involutions. More precisely, if the
+        tableau is interpreted as a (type A) semistandard tableau in the alphabet
+        `1<...<2n`, then the first four maps are the `2i`th, the `(2i-1)`st, the
+        `(2i+1)`st, and the `2i`th Bender--Knuth involutions. The fifth map 
+        changes every `\{i, i'\}`-vertical domino between rows `i` and `i+1` for
+        a `\{i+1, i+1'\}`-vertical domino. It then resorts rows `i` and `i+1` as
+        to make them increasing.
+        
+        The function converts the tableau to a King tableau, performs the involution
+        and converts back to the original type. If ``display`` is set to ``True``,
+        then the intermediate stages of the algorithm are displayed.
+        
+        EXAMPLES::
+            sage: T = SymplecticTableau(3, rows = [[1,3,4],[5,5,6],[6,6]]); T
+            1  2  2'
+            3  3  3'
+            3' 3'
+            sage: T.bender_knuth_involution(0)
+            1' 2  2'
+            3  3  3'
+            3' 3'
+            sage: T.bender_knuth_involution(2, display = True)
+            Now applying Bender--Knuth to the tableau
+            T0 :
+            1  2  2'
+            3  3  3'
+            3' 3'
+            ---------------
+            T1 :
+            1  2  3
+            2' 2' 3'
+            3' 3'
+            ---------------
+            T2 :
+            1  2  3
+            2  2' 3'
+            3' 3'
+            ---------------
+            T3 :
+            1  2  3
+            2  2' 3'
+            3  3
+            ---------------
+            T4 :
+            1  2  2'
+            2  2' 3'
+            2' 3
+            ---------------
+            T5 :
+            1  2  2'
+            2' 3  3'
+            3  3'
+            ---------------
+            1  2  2'
+            2' 3  3'
+            3  3'
+        """        
+        Type = self._type
+        KingT = self.to_type('King')
+        
+        if i == 0:
+            T0 = SemistandardTableau(KingT._rows)
+            T1 = T0.bender_knuth_involution(1)
+            Result = SymplecticTableau(self._n, rows = T1, type = 'King')
+            return Result.to_type(Type)
+        
+        T0 = SemistandardTableau(KingT._rows)
         T1 = T0.bender_knuth_involution(2*i)
         T2 = T1.bender_knuth_involution(2*i-1)
         T3 = T2.bender_knuth_involution(2*i+1)
@@ -180,32 +313,46 @@ class SymplecticTableau(SageObject):
             print('Now applying Bender--Knuth to the tableau')
             tabs = [T0, T1, T2, T3, T4, T5]
             for i in range(len(tabs)):
-                print(GelfandTsetlinPattern(tabs[i]).pp()); print('                    = T%s\n'%str(i))
-                #print(repr(SymplecticTableau(self._n, rows = tabs[i]))); print('                    = T%s\n'%str(i))
-        return SymplecticTableau(self._n, rows = T5, type = 'King')
-    def alternativa(self, i, display=False):
-        assert self._type == 'King', 'Bender--Knuth involutions are only implemented on King tableaux'
-        T0 = SemistandardTableau(self._rows)
-        T1 = T0.bender_knuth_involution(2*i)
-        T2 = T1.bender_knuth_involution(2*i-1)
-        T3 = T2.bender_knuth_involution(2*i+1)
-        T4 = T3.bender_knuth_involution(2*i)
-        T5 = T4
-        T6 = T5.bender_knuth_involution(2*i)
-        T7 = T6.bender_knuth_involution(2*i-1)
-        T8 = T7.bender_knuth_involution(2*i+1)
-        T9 = T8.bender_knuth_involution(2*i)
-        if display:
-            print('Now applying Bender--Knuth to the tableau')
-            tabs = [T0, T1, T2, T3, T4, T5, T6, T7, T8, T9]
-            for i in range(len(tabs)):
-                print(GelfandTsetlinPattern(tabs[i]).pp()); print('                    = T%s\n'%str(i))
-                #print(repr(SymplecticTableau(self._n, rows = tabs[i]))); print('                    = T%s\n'%str(i))
-        return SymplecticTableau(self._n, rows = T9, type = 'King')
+                print('T%s :'%str(i))
+                #print(GelfandTsetlinPattern(tabs[i]).pp())
+                print(repr(SymplecticTableau(self._n, rows = tabs[i])))
+                print('-'*15)
+        Result = SymplecticTableau(self._n, rows = T5, type = 'King')
+        return Result.to_type(Type)
     def to_GTpattern(self):
-        tking = self.King()
-        return KingTableau_to_SymplecticPattern(tking)
+        r"""
+        Returns the symplectic Gelfand--Tsetlin pattern associated with the tableau.
+        
+        EXAMPLES::
+            sage: T = SymplecticTableau(3, rows = [[1,3,4],[5,5,6],[6,6]]); T
+            1  2  2'
+            3  3  3'
+            3' 3'
+            sage: T.to_GTpattern()
+            3   3   2
+            3   2   0
+              3   0
+              2   0
+                1
+                1
+        """
+        KingT = self.King()
+        return KingTableau_to_SymplecticPattern(KingT)
     def King(self):
+        r"""
+        Returns the King tableau corresponding to the tableau.
+        
+        If ``self`` is a King tableau, this returns ``self``.
+        
+        If ``self`` is a DeConcini tableau, it applies Sheats' bijection.
+        See :meth:`.SymplecticTableaux.Sheats`.
+        
+        If ``self`` is a Krattenthaler tableau, we first convert to a
+        DeConcini tableau.
+        
+        If ``self`` is a Kashiwara tableau, we first convert to a
+        Krattenthaler tableau.
+        """
         if self._type == 'King':
             return self
         elif self._type == 'DeConcini':
@@ -216,6 +363,20 @@ class SymplecticTableau(SageObject):
             return Kashiwara_to_King(self)
         raise ValueError("Cannot transfrom from custom to King tableau")
     def DeConcini(self):
+        r"""
+        Returns the De Concini tableau corresponding to the tableau.
+        
+        If ``self`` is a King tableau, it applies Sheats' bijection.
+        See :meth:`.SymplecticTableaux.Sheats`.
+        
+        If ``self`` is a DeConcini tableau, this returns ``self``.
+        
+        If ``self`` is a Krattenthaler tableau, it takes the inverse
+        of the split map. See :meth:`.SymplecticTableaux.splitInverse`.
+        
+        If ``self`` is a Kashiwara tableau, it first converts to a
+        Krattenthaler tableau.
+        """
         if self._type == 'King':
             return King_to_DeConcini(self)
         elif self._type == 'DeConcini':
@@ -226,6 +387,20 @@ class SymplecticTableau(SageObject):
             return Kashiwara_to_DeConcini(self)
         raise ValueError("Cannot transfrom from custom to De Concini tableau")
     def Krattenthaler(self):
+        r"""
+        Returns the Krattenthaler tableau corresponding to the tableau.
+        
+        If ``self`` is a King tableau, it first converts to a
+        De Concini tableau.
+        
+        If ``self`` is a DeConcini tableau, it returns the split version.
+        See :meth:`.SymplecticTableaux.splitVersion`.
+        
+        If ``self`` is a Krattenthaler tableau, this returns ``self``.
+        
+        If ``self`` is a Kashiwara tableau, it returns the cosplit version.
+        See :meth:`.SymplecticTableaux.cosplitVersion`.
+        """
         if self._type == 'King':
             return King_to_Krattenthaler(self)
         elif self._type == 'DeConcini':
@@ -236,6 +411,20 @@ class SymplecticTableau(SageObject):
             return Kashiwara_to_Krattenthaler(self)
         raise ValueError("Cannot transfrom from custom to Krattenthaler tableau")
     def Kashiwara(self):
+        r"""
+        Returns the Kashiwara tableau corresponding to the tableau.
+        
+        If ``self`` is a King tableau, it first converts to a
+        De Concini tableau.
+        
+        If ``self`` is a DeConcini tableau, it first converts to a
+        Krattenthaler tableau.
+        
+        If ``self`` is a Krattenthaler tableau, it takes the inverse
+        of the cosplit map. See :meth:`.SymplecticTableaux.cosplitInverse`.
+        
+        If ``self`` is a Kashiwara tableau, this returns ``self``.
+        """
         if self._type == 'King':
             return King_to_Kashiwara(self)
         elif self._type == 'DeConcini':
@@ -245,7 +434,31 @@ class SymplecticTableau(SageObject):
         elif self._type == 'Kashiwara':
             return self
         raise ValueError("Cannot transfrom from custom to Kashiwara tableau")
-    def _to_type(self, type):
+    def to_type(self, type):
+        r"""
+        Converts to the desired type.
+        
+        INPUT:
+            - type: Either 'King', 'DeConcini', 'Krattenthaler', or 'Kashiwara'.
+            
+        EXAMPLES::
+            sage: T = SymplecticTableau(3, rows = [[1,3],[5,5],[6,6]]); T
+            1  2
+            3  3
+            3' 3'
+            sage: T.to_type('DeConcini')
+            3' 2'
+            2' 1'
+            2  3
+            sage: T.to_type('Krattenthaler')
+            1 1 2 2
+            2 3 3 3
+            4 5 6 6
+            sage: T.to_type('Kashiwara')
+            1  2
+            3  3
+            3' 1'
+        """
         if type == 'King':
             return self.King()
         elif type == 'DeConcini':
@@ -254,10 +467,16 @@ class SymplecticTableau(SageObject):
             return self.Krattenthaler()
         elif type == 'Kashiwara':
             return self.Kashiwara()
-        raise ValueError("Can only convert to types 'King', 'DeConcini' or 'Kashiwara'")
+        raise ValueError("Can only convert to types 'King', 'DeConcini', 'Krattenthaler', or 'Kashiwara'")
     def f(self, i):
         r"""
         Applies the crystal operator f(i).
+        
+        Crystal operators are already implemented in Sage for Kashiwara's tableaux.
+        See :meth:`crystals.tensor_product`. This functions converts the tableau
+        to a Kashiwara tableau, performs the crystal operator, and converts back to
+        the original type.
+        
         """
         if self._type == 'King' or self._type == 'DeConcini':
             I = self._n+1-i
@@ -272,10 +491,15 @@ class SymplecticTableau(SageObject):
         if tabCrystalElement == None:
             return SymplecticTableau(self._n, rows = [], type = self._type)
         tabKashiwara = CrystalElement_to_KashiwaraTableau(tabCrystalElement, self._n)
-        return tabKashiwara._to_type(self._type)
+        return tabKashiwara.to_type(self._type)
     def e(self, i):
         r"""
         Applies the crystal operator e(i).
+        
+        Crystal operators are already implemented in Sage for Kashiwara's tableaux.
+        See :meth:`crystals.tensor_product`. This functions converts the tableau
+        to a Kashiwara tableau, performs the crystal operator, and converts back to
+        the original type.
         """
         if self._type == 'King' or self._type == 'DeConcini':
             I = self._n+1-i
@@ -290,7 +514,7 @@ class SymplecticTableau(SageObject):
         if tabCrystalElement == None:
             return SymplecticTableau(self._n, rows = [], type = self._type)
         tabKashiwara = CrystalElement_to_KashiwaraTableau(tabCrystalElement, self._n)
-        return tabKashiwara._to_type(self._type)
+        return tabKashiwara.to_type(self._type)
         
 class SymplecticTableauIterator:
     def __init__(self, tab):
@@ -329,6 +553,7 @@ def splitVersion(tab):
     return SymplecticTableau(tab._n, cols = new, type = 'Krattenthaler')
     
 def _splitCol(col, n):
+    assert is_admissible(col, n), "this column is not admissible: %s"%(col)
     circ = _circles(col, n)
     A = circ[0]
     D = circ[1]
@@ -353,6 +578,7 @@ def cosplitVersion(tab):
     return SymplecticTableau(tab._n, cols = new, type = 'Krattenthaler')
     
 def _cosplitCol(col, n):
+    assert is_coadmissible(col, n), "this column is not coadmissible: %s"%(col)
     circ = _circles(col, n)
     B = circ[0]
     C = circ[1]
@@ -384,7 +610,7 @@ def cosplitInverse(tab):
     r'''
     Takes the cosplit version of a tableau (in the alphabet
     `1<2<...<2n`) and gives the original tableau.    
-    '''
+    '''    
     new = _cosplitInverseCols(tab._cols, tab._n)
     return SymplecticTableau(tab._n, cols = new, type = 'Kashiwara')
     
@@ -410,13 +636,13 @@ def is_admissible(c, n):
 def is_coadmissible(c, n):
     r'''
     Takes a semistard column in `1<2<...<2n`, relabels it to
-    `n'<...<2'<1'<1<2<...<n` and checks admissibility.
+    `n'<...<2'<1'<1<2<...<n` and checks coadmissibility.
     '''
     for i in [1..n]:
         iPrime = n+1-i
         iNormal = n+i
-        entries = [e for e in c if e <= iPrime and e >= iNormal]
-        if len(entries) > i:
+        entries = [e for e in c if e <= iPrime or e >= iNormal]
+        if len(entries) > n+1-i:
             return False
     return True
 
