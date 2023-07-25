@@ -1,6 +1,8 @@
 # SymplecticTableaux
 A SageMath library implementing symplectic tableaux and symplectic patterns.
 
+**Warning:** This library hasn't been thoroughly tested. Bugs may exist.
+
 ### Instalation
 To use this locally, save the file in your computer (e.g. in Desktop). Then run a Sage console in this path directory and load the file.
 ```
