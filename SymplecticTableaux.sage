@@ -71,7 +71,7 @@ class SymplecticTableau(SageObject):
     ``n' < \cdots < 2' < 1' <\cdots< 2 < \cdots < n.``
     These are well-defined if every column is admissible (after
     reordering to the King's alphabet) and their split version is
-    semistandard. See [She
+    semistandard. See [She99].
     
     A third model is Krattenthaler's. These are displayed in the
     alphabet ``1 <\cdots< \cdots < 2n.``
