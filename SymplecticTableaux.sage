@@ -389,6 +389,8 @@ class SymplecticTableau(SageObject):
         elif self._type == 'Kashiwara':
             return Kashiwara_to_DeConcini(self)
         raise ValueError("Cannot transfrom from custom to De Concini tableau")
+    def split(self):
+        return self.Krattenthaler()
     def Krattenthaler(self):
         r"""
         Returns the Krattenthaler tableau corresponding to the tableau.
@@ -661,12 +663,18 @@ def DeConcini_to_Kashiwara(tab):
     return cosplitInverse(splitVersion(tab))
 def Kashiwara_to_DeConcini(tab):
     return splitInverse(cosplitVersion(tab))
+def King_to_split(tab):
+    return King_to_Krattenthaler(tab)
 def King_to_Krattenthaler(tab):
     return splitVersion(King_to_DeConcini(tab))
 def Krattenthaler_to_King(tab):
     return DeConcini_to_King(splitInverse(tab))
+def DeConcini_to_split(tab):
+    return DeConcini_to_Krattenthaler(tab)
 def DeConcini_to_Krattenthaler(tab):
     return splitVersion(tab)
+def Kashiwara_to_split(tab):
+    return Kashiwara_to_Krattenthaler(tab)
 def Kashiwara_to_Krattenthaler(tab):
     return cosplitVersion(tab)
 def KashiwaraTableau_to_CrystalElement(tab):
