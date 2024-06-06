@@ -71,7 +71,7 @@ class SymplecticTableau(SageObject):
     ``n' < \cdots < 2' < 1' <\cdots< 2 < \cdots < n.``
     These are well-defined if every column is admissible (after
     reordering to the King's alphabet) and their split version is
-    semistandard. See [She99].
+    semistandard. See [She99]
     
     A third model is Krattenthaler's. These are displayed in the
     alphabet ``1 <\cdots< \cdots < 2n.``
@@ -137,7 +137,7 @@ class SymplecticTableau(SageObject):
                 self._alphabet = sum([[str(i), str(i) + "'"] for i in [1..n]], [])
             elif type == 'DeConcini':
                 self._alphabet = [str(i) + "'" for i in [1..n][::-1]] + [str(i) for i in [1..n]]
-            elif type == 'Krattenthaler':
+            elif type == 'Krattenthaler' or type == "split":
                 self._alphabet = [str(i) for i in [1..2*n]]
             elif type == 'Kashiwara':
                 self._alphabet = [str(i) for i in [1..n]] + [str(i) + "'" for i in [1..n][::-1]]
@@ -159,7 +159,7 @@ class SymplecticTableau(SageObject):
             alph2.append(alph[i] + " "*(l - len(alph[i])))
         return '\n'.join(' '.join(alph2[i] for i in row) for row in self._rows)
     def __str__(self):
-        if self._type == "Krattenthaler" or self._type == "Custom":
+        if self._type == "Krattenthaler" or self._type == "split" or self._type == "Custom":
             return f"Symplectic tableau of type {self._type} and shape {self._shape}"
         return f"Symplectic tableau of type {self._type}, shape {self._shape}, and weight {self._weight}"
     def cols(self):
@@ -192,7 +192,7 @@ class SymplecticTableau(SageObject):
             return all(self._rows[i][0] >= 2*i+1 for i in range(len(self._rows)))
         elif self._type == 'DeConcini':
             return all([is_admissible(c, self._n) for c in self._cols]) and splitVersion(self)._t.is_semistandard()
-        elif self._type == 'Krattenthaler':
+        elif self._type == 'Krattenthaler' or self._type == 'split':
             return cosplitVersion(cosplitInverse(self)) == self and self._t.is_semistandard()
         elif self._type == 'Kashiwara':
             return all([is_coadmissible(c, self._n) for c in self._cols]) and cosplitVersion(self)._t.is_semistandard()
@@ -202,7 +202,7 @@ class SymplecticTableau(SageObject):
     def size(self):
         return self._n
     def weight(self):
-        if self._type == "Krattenthaler" or self._type == "Custom":
+        if self._type == "Krattenthaler" or self._type == "split" or self._type == "Custom":
             return "Weight is only defined for King, De Cocini, or Kashiwara tableaux."
         l = len(self._alphabet[0])
         alph = ['*'] + self._alphabet
@@ -213,7 +213,7 @@ class SymplecticTableau(SageObject):
             w[i] = R.count("%s"%i) - R.count("%s'"%i)
         return ''.join('x%s^(%s)'%(i, w[i]) for i in [1..self._n] if w[i] != 0)
     def shape(self):
-        if self._type == 'Krattenthaler':
+        if self._type == 'Krattenthaler' or self._type == "split":
             return Partition([int(len(row)/2) for row in self._rows])
         else:
             return Partition([len(row) for row in self._rows])
@@ -360,7 +360,7 @@ class SymplecticTableau(SageObject):
             return self
         elif self._type == 'DeConcini':
             return DeConcini_to_King(self)
-        elif self._type == 'Krattenthaler':
+        elif self._type == 'Krattenthaler' or self._type == "split":
             return Krattenthaler_to_King(self)
         elif self._type == 'Kashiwara':
             return Kashiwara_to_King(self)
@@ -384,7 +384,7 @@ class SymplecticTableau(SageObject):
             return King_to_DeConcini(self)
         elif self._type == 'DeConcini':
             return self
-        elif self._type == 'Krattenthaler':
+        elif self._type == 'Krattenthaler' or self._type == "split":
             return Krattenthaler_to_DeConcini(self)
         elif self._type == 'Kashiwara':
             return Kashiwara_to_DeConcini(self)
@@ -408,7 +408,7 @@ class SymplecticTableau(SageObject):
             return King_to_Krattenthaler(self)
         elif self._type == 'DeConcini':
             return DeConcini_to_Krattenthaler(self)
-        elif self._type == 'Krattenthaler':
+        elif self._type == 'Krattenthaler' or self._type == "split":
             return self
         elif self._type == 'Kashiwara':
             return Kashiwara_to_Krattenthaler(self)
@@ -432,7 +432,7 @@ class SymplecticTableau(SageObject):
             return King_to_Kashiwara(self)
         elif self._type == 'DeConcini':
             return DeConcini_to_Kashiwara(self)
-        elif self._type == 'Krattenthaler':
+        elif self._type == 'Krattenthaler' or self._type == "split":
             return Krattenthaler_to_Kashiwara(self)
         elif self._type == 'Kashiwara':
             return self
@@ -466,7 +466,7 @@ class SymplecticTableau(SageObject):
             return self.King()
         elif type == 'DeConcini':
             return self.DeConcini()
-        elif type == 'Krattenthaler':
+        elif type == 'Krattenthaler' or type == "split":
             return self.Krattenthaler()
         elif type == 'Kashiwara':
             return self.Kashiwara()
@@ -483,7 +483,7 @@ class SymplecticTableau(SageObject):
         """
         if self._type == 'King' or self._type == 'DeConcini':
             I = self._n+1-i
-        elif self._type == 'Kashiwara' or self._type == 'Krattenthaler':
+        elif self._type == 'Kashiwara' or self._type == 'Krattenthaler' or self._type == "split":
             I = i
         else:
             raise ValueError("Cannot perform crystal operators on custom tableaux")
@@ -506,7 +506,7 @@ class SymplecticTableau(SageObject):
         """
         if self._type == 'King' or self._type == 'DeConcini':
             I = self._n+1-i
-        elif self._type == 'Kashiwara' or self._type == 'Krattenthaler':
+        elif self._type == 'Kashiwara' or self._type == 'Krattenthaler' or self._type == "split":
             I = i
         else:
             raise ValueError("Cannot perform crystal operators on custom tableaux")
