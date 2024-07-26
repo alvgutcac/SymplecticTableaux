@@ -90,8 +90,8 @@ class SymplecticTableau(SageObject):
     
     EXAMPLES::
     sage: tab = SymplecticTableau(3, rows = [[1,1,2,3,3],[4,4,5,6]]); tab
-    1  1  1' 2' 2'
-    2  2  3  3'
+    1  1  1' 2  2 
+    2' 2' 3  3'
     sage: tab.is_well_defined()
     True
     sage: tab.DeConcini()
@@ -137,7 +137,7 @@ class SymplecticTableau(SageObject):
                 self._alphabet = sum([[str(i), str(i) + "'"] for i in [1..n]], [])
             elif type == 'DeConcini':
                 self._alphabet = [str(i) + "'" for i in [1..n][::-1]] + [str(i) for i in [1..n]]
-            elif type == 'Krattenthaler' or type == "split":
+            elif type == 'Krattenthaler' or type == 'split':
                 self._alphabet = [str(i) for i in [1..2*n]]
             elif type == 'Kashiwara':
                 self._alphabet = [str(i) for i in [1..n]] + [str(i) + "'" for i in [1..n][::-1]]
@@ -148,6 +148,8 @@ class SymplecticTableau(SageObject):
         self._weight = self.weight()
     def __eq__(self, other):
         return self.King()._rows == other.King()._rows
+    def __hash__(self):
+        return hash(tuple(tuple(row) for row in self.King()._rows))
     def __repr__(self):
         if self._rows == []:
             return ''
@@ -204,14 +206,19 @@ class SymplecticTableau(SageObject):
     def weight(self):
         if self._type == "Krattenthaler" or self._type == "split" or self._type == "Custom":
             return "Weight is only defined for King, De Cocini, or Kashiwara tableaux."
-        l = len(self._alphabet[0])
+        #l = len(self._alphabet[0])
         alph = ['*'] + self._alphabet
-        R = sum([[alph[i] for i in row] for row in self._rows], [])
+        R = [alph[i] for row in self._rows for i in row]
         
         w = {}
         for i in [1..self._n]:
             w[i] = R.count("%s"%i) - R.count("%s'"%i)
         return ''.join('x%s^(%s)'%(i, w[i]) for i in [1..self._n] if w[i] != 0)
+    def rk(self):
+        if self._type == 'Kashiwara':
+            return sum(sum(row) for row in self._rows)
+        else:
+            return self.Kashiwara().rk()
     def shape(self):
         if self._type == 'Krattenthaler' or self._type == "split":
             return Partition([int(len(row)/2) for row in self._rows])
@@ -1059,3 +1066,77 @@ class abstractPattern(SageObject):
             D[j][j] = 0
         D[i][j] = Min(D[j+1][i], D[j-1][i-1]) + Max(D[j+1][i+1], D[j-1][i]) - D[j][i]
         return abstractPattern(dict = D)
+        
+#############################################################################################################
+
+class SymplecticCrystal(SageObject):
+    r"""
+    Implementation of the crystal graph of `Sp(2n)` indexed by a given partition `\lambda`.
+    Vertices of the graph are of type SymplecticTableau.
+    
+    WARNING::
+    The methods of this class are slow.    
+    
+    EXAMPLES::
+    sage: C = SymplecticCrystal(3,[2]); C
+    Crystal graph of the representation of Sp(6) indexed by [2]
+    sage: len(C.vertices())
+    21
+    sage: C.plot()
+    Launched png viewer for Graphics object consisting of 48 graphics primitives
+    sage: C.plot(type = 'King')
+    Launched png viewer for Graphics object consisting of 48 graphics primitives
+    """
+    def __init__(self, n, lam):
+        r"""
+        INPUT:
+            - n : Positive integer
+            - lam : Partition
+        """
+        self.n = n
+        self.shape = lam
+        self._crystal = crystals.Tableaux(['C',n], shape = lam)
+        self._vertices = [CrystalElement_to_KashiwaraTableau(t, self.n) for t in self._crystal]
+        self.compute_graph()
+    
+    def __repr__(self):
+        return f"Crystal graph of the representation of Sp({2*self.n}) indexed by {self.shape}"
+    
+    def vertices(self):
+        return self._vertices
+    
+    def poset(self):
+        r"""
+        Returns the finite poset given by the crystal graph.
+        """
+        from sage.combinat.posets.posets import FinitePoset
+        return FinitePoset(self._crystal.digraph())
+    
+    def compute_graph(self):
+        G = DiGraph()
+        for (u,v,c) in self._crystal.digraph().edges():
+            G.add_edge((CrystalElement_to_KashiwaraTableau(u, self.n),CrystalElement_to_KashiwaraTableau(v, self.n),c))
+        self.graph = G
+    
+    def heights(self):
+        l = len(self.shape)
+        highest_height = sum((2*self.n-i)*self.shape[-i-1] for i in range(l))
+        aux = {r : [] for r in range(highest_height+2)}
+        for t in self._vertices:
+            aux[t.rk()].append(t)
+        return aux
+        
+    def plot(self, type = 'Kashiwara'):
+        r"""
+        INPUT:
+            - type : Either 'King', 'DeConcini', 'Krattenthaler' or 'Kashiwara'. (Default: 'Kashiwara')
+        """
+        opt = {
+           'heights' : self.heights(),
+           'layout' : 'acyclic',
+           'figsize' : 20,
+           'color_by_label' : True,
+           'vertex_size' : 800,
+           'vertex_labels' : lambda t : t.to_type(type).__repr__()
+           }
+        return self.graph.plot(**opt)
